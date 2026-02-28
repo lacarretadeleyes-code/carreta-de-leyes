@@ -156,7 +156,7 @@ app.post("/api/save-to-drive", async (req, res) => {
     `#${i+1} ${e.titular}\nResumen: ${e.resumen||"—"}\nActores: ${e.actoresClave||"—"}\nConclusión: ${e.conclusion||"—"}\nFuentes: ${(e.fuentes||[]).join(", ")||"—"}\nTemas: ${(e.tags||[]).join(", ")||"Sin clasificar"}`
   ).join("\n\n---\n\n");
   try {
-    await fetch(process.env.ZAPIER_WEBHOOK_URL, {
+    await fetch(process.env.ZAPIER_WEBHOOK_URL + "", {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
         fileName: `Reporte_${report.userName.replace(/ /g,"_")}_${report.weekDate}.txt`,
