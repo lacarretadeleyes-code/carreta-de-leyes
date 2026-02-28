@@ -412,7 +412,7 @@ export default function App() {
   };
   const enterAdmin=async()=>{
     const data=await api("/api/admin-auth",{method:"POST",body:JSON.stringify({password:adminPwd})});
-    if(data.ok){setAdminError(false);setCurrentUser({id:0,name:"Admin",emoji:"🛠️",role:"admin"});setScreen("admin");}
+    if(data.ok){setAdminError(false);setAdminPwd("");setCurrentUser({id:0,name:"Admin",emoji:"🛠️",role:"admin"});setScreen("admin");}
     else setAdminError(true);
   };
   const confirmDelete=(type,id,label)=>setDeleteConfirm({type,id,label});
