@@ -98,14 +98,27 @@ app.delete("/api/reports/:id", (req, res) => {
 app.post("/api/tag-entries", async (req, res) => {
   const { entries } = req.body;
   const prompt = `Analiza cada entrada y asígnale 1-3 etiquetas del listado: ${TAGS.join(", ")}.
-Responde SOLO JSON sin backticks: {"entries":[{"id":"...","tags":["Tag1"]}]}
-Entradas: ${JSON.stringify(entries.map(e=>({id:e.id,text:`${e.titular}. ${e.resumen||""}`})))}`;
+Responde SOLO JSON sin backticks ni explicaciones adicionales:
+{"entries":[{"id":"...","tags":["Tag1"]}]}
+Entradas: ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen || ""}` })))}`;
+
   try {
     const txt = await gemini(prompt);
-    const parsed = JSON.parse(txt.replace(/```json|```/g,"").trim());
-    parsed.entries.forEach(e => db.prepare("UPDATE entries SET tags=? WHERE id=?").run(JSON.stringify(e.tags), e.id));
+    console.log("[tag-entries] Respuesta Gemini:", txt.substring(0, 200));
+
+    // Extrae el JSON aunque Gemini agregue texto alrededor
+    const jsonMatch = txt.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Gemini no devolvió JSON válido: " + txt.substring(0, 100));
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    parsed.entries.forEach(e =>
+      db.prepare("UPDATE entries SET tags=? WHERE id=?").run(JSON.stringify(e.tags), e.id)
+    );
     res.json(parsed);
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    console.error("[tag-entries] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GENERATE WHATSAPP
@@ -145,27 +158,54 @@ ${lines.join("\n")}
 FUENTES POR ENTRADA:
 ${fuentesPorEntrada}`);
     res.json({ message: txt.trim() });
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch(err) {
+    console.error("[generate-whatsapp] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // SAVE TO DRIVE
 app.post("/api/save-to-drive", async (req, res) => {
   const { report } = req.body;
-  const content = report.entries.map((e,i) =>
-    `#${i+1} ${e.titular}\nResumen: ${e.resumen||"—"}\nActores: ${e.actoresClave||"—"}\nConclusión: ${e.conclusion||"—"}\nFuentes: ${(e.fuentes||[]).join(", ")||"—"}\nTemas: ${(e.tags||[]).join(", ")||"Sin clasificar"}`
+
+  // Validación temprana de la variable de entorno
+  if (!process.env.ZAPIER_WEBHOOK_URL) {
+    console.error("[save-to-drive] ZAPIER_WEBHOOK_URL no está definida en las variables de entorno");
+    return res.status(500).json({ error: "ZAPIER_WEBHOOK_URL no configurada en el servidor" });
+  }
+
+  const content = report.entries.map((e, i) =>
+    `#${i + 1} ${e.titular}\nResumen: ${e.resumen || "—"}\nActores: ${e.actoresClave || "—"}\nConclusión: ${e.conclusion || "—"}\nFuentes: ${(e.fuentes || []).join(", ") || "—"}\nTemas: ${(e.tags || []).join(", ") || "Sin clasificar"}`
   ).join("\n\n---\n\n");
+
+  const payload = {
+    fileName: `Reporte_${report.userName.replace(/ /g, "_")}_${report.weekDate}.txt`,
+    author: report.userName,
+    area: report.userArea,
+    week: report.weekDate,
+    entriesCount: report.entries.length,
+    content: `LA CARRETA DE LEYES\n${"=".repeat(40)}\nAutor: ${report.userName}\nSemana: ${report.weekDate}\n\n${content}\n\n${DISCLAIMER}`
+  };
+
   try {
-    await fetch(process.env.ZAPIER_WEBHOOK_URL + "", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        fileName: `Reporte_${report.userName.replace(/ /g,"_")}_${report.weekDate}.txt`,
-        author: report.userName, area: report.userArea,
-        week: report.weekDate, entriesCount: report.entries.length,
-        content: `LA CARRETA DE LEYES\n${"=".repeat(40)}\nAutor: ${report.userName}\nSemana: ${report.weekDate}\n\n${content}\n\n${DISCLAIMER}`
-      })
+    const response = await fetch(process.env.ZAPIER_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
+
+    console.log("[save-to-drive] Zapier status:", response.status);
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Zapier respondió ${response.status}: ${body.substring(0, 100)}`);
+    }
+
     res.json({ ok: true });
-  } catch(err) { res.status(500).json({ error: "Error al enviar a Drive" }); }
+  } catch (err) {
+    console.error("[save-to-drive] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ADMIN AUTH
@@ -175,4 +215,9 @@ app.post("/api/admin-auth", (req, res) => {
     : res.status(401).json({ error: "Clave incorrecta" });
 });
 
-app.listen(PORT, () => console.log(`🚀 Puerto ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Puerto ${PORT}`);
+  console.log("✅ GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "cargada" : "❌ FALTA");
+  console.log("✅ ZAPIER_WEBHOOK_URL:", process.env.ZAPIER_WEBHOOK_URL ? "cargada" : "❌ FALTA");
+  console.log("✅ ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "cargada" : "❌ FALTA");
+});
