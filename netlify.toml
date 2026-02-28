@@ -1,15 +1,10 @@
 [build]
   base = "frontend"
   command = "npm run build"
-  publish = "frontend/dist"
+  publish = "dist"
 
 [[headers]]
   for = "/*.js"
-  [headers.values]
-    Content-Type = "application/javascript"
-
-[[headers]]
-  for = "/*.jsx"
   [headers.values]
     Content-Type = "application/javascript"
 
