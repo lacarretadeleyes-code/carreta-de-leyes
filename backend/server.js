@@ -1,13 +1,10 @@
 const express = require("express");
 const cors = require("cors");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const pool = require("./database");
 require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
 const DISCLAIMER = "Las opiniones expresadas son personales y no representan la posicion de La Carreta de Leyes.";
 const TAGS = ["Educacion","Seguridad","Economia","Agro","Pensiones","Salud","Politica Exterior","Trabajo","Medioambiente","Tecnologia","Corrupcion"];
@@ -17,9 +14,22 @@ app.use(express.json());
 
 app.get("/api/ping", (req, res) => res.json({ ok: true }));
 
-async function gemini(prompt) {
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+async function groq(prompt) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 2048
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(JSON.stringify(data));
+  return data.choices[0].message.content;
 }
 
 async function shortenUrl(url) {
@@ -127,10 +137,10 @@ Responde SOLO JSON sin backticks ni explicaciones adicionales:
 Entradas: ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen || ""}` })))}`;
 
   try {
-    const txt = await gemini(prompt);
-    console.log("[tag-entries] Respuesta Gemini:", txt.substring(0, 200));
+    const txt = await groq(prompt);
+    console.log("[tag-entries] Respuesta:", txt.substring(0, 200));
     const jsonMatch = txt.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Gemini no devolvio JSON valido");
+    if (!jsonMatch) throw new Error("No devolvio JSON valido");
     const parsed = JSON.parse(jsonMatch[0]);
     for (const e of parsed.entries) {
       await pool.query("UPDATE entries SET tags=$1 WHERE id=$2", [JSON.stringify(e.tags), e.id]);
@@ -162,7 +172,7 @@ app.post("/api/generate-whatsapp", async (req, res) => {
     ).join("\n");
 
     const authors = [...new Set(reports.map(r => r.user_name || r.userName))].join(", ");
-    const txt = await gemini(`Redacta un boletin politico para WhatsApp en espanol.
+    const txt = await groq(`Redacta un boletin politico para WhatsApp en espanol.
 REGLAS:
 - Emojis moderados, formato WhatsApp (*negrita*, _cursiva_)
 - Secciones claras, no pierdas contexto politico
@@ -255,7 +265,7 @@ app.post("/api/admin-auth", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Puerto ${PORT}`);
-  console.log("GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "cargada" : "FALTA");
+  console.log("GROQ_API_KEY:", process.env.GROQ_API_KEY ? "cargada" : "FALTA");
   console.log("ZAPIER_WEBHOOK_URL:", process.env.ZAPIER_WEBHOOK_URL ? "cargada" : "FALTA");
   console.log("ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "cargada" : "FALTA");
   console.log("DATABASE_URL:", process.env.DATABASE_URL ? "cargada" : "FALTA");
