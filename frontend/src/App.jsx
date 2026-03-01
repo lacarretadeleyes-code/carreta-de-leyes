@@ -99,13 +99,8 @@ function AdminWhatsApp({reports}) {
 
   const shortenUrl=async(url)=>{
     try{
-      const res=await fetch("https://cleanuri.com/api/v1/shorten",{
-        method:"POST",
-        headers:{"Content-Type":"application/x-www-form-urlencoded"},
-        body:"url="+encodeURIComponent(url)
-      });
-      const data=await res.json();
-      return data.result_url||url;
+      const data=await api("/api/shorten",{method:"POST",body:JSON.stringify({url})});
+      return data.short||url;
     }catch{return url;}
   };
 
