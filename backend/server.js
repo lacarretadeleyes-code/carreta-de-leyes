@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const db = require("./database");
+const pool = require("./database");
 require("dotenv").config();
 
 const app = express();
@@ -31,68 +31,90 @@ async function shortenUrl(url) {
 }
 
 // USERS
-app.get("/api/users", (req, res) => {
-  res.json(db.prepare("SELECT * FROM users ORDER BY created_at ASC").all());
+app.get("/api/users", async (req, res) => {
+  const { rows } = await pool.query("SELECT * FROM users ORDER BY created_at ASC");
+  res.json(rows);
 });
 
-app.post("/api/users", (req, res) => {
+app.post("/api/users", async (req, res) => {
   const { name, area, emoji, role = "empleado" } = req.body;
   if (!name) return res.status(400).json({ error: "Nombre requerido" });
-  const existing = db.prepare("SELECT * FROM users WHERE LOWER(name)=LOWER(?) AND role='empleado'").get(name);
-  if (existing) {
-    db.prepare("UPDATE users SET area=?, emoji=? WHERE id=?").run(area, emoji, existing.id);
+  const { rows } = await pool.query("SELECT * FROM users WHERE LOWER(name)=LOWER($1) AND role='empleado'", [name]);
+  if (rows.length > 0) {
+    const existing = rows[0];
+    await pool.query("UPDATE users SET area=$1, emoji=$2 WHERE id=$3", [area, emoji, existing.id]);
     return res.json({ ...existing, area, emoji });
   }
-  const r = db.prepare("INSERT INTO users (name,area,emoji,role) VALUES (?,?,?,?)").run(name, area, emoji, role);
-  res.json({ id: r.lastInsertRowid, name, area, emoji, role });
+  const r = await pool.query(
+    "INSERT INTO users (name,area,emoji,role) VALUES ($1,$2,$3,$4) RETURNING *",
+    [name, area, emoji, role]
+  );
+  res.json(r.rows[0]);
 });
 
-app.delete("/api/users/:id", (req, res) => {
+app.delete("/api/users/:id", async (req, res) => {
   const { id } = req.params;
-  const reports = db.prepare("SELECT id FROM reports WHERE user_id=?").all(id);
-  reports.forEach(r => {
-    db.prepare("SELECT id FROM entries WHERE report_id=?").all(r.id)
-      .forEach(e => db.prepare("DELETE FROM fuentes WHERE entry_id=?").run(e.id));
-    db.prepare("DELETE FROM entries WHERE report_id=?").run(r.id);
-  });
-  db.prepare("DELETE FROM reports WHERE user_id=?").run(id);
-  db.prepare("DELETE FROM users WHERE id=?").run(id);
+  const { rows: reports } = await pool.query("SELECT id FROM reports WHERE user_id=$1", [id]);
+  for (const r of reports) {
+    const { rows: entries } = await pool.query("SELECT id FROM entries WHERE report_id=$1", [r.id]);
+    for (const e of entries) {
+      await pool.query("DELETE FROM fuentes WHERE entry_id=$1", [e.id]);
+    }
+    await pool.query("DELETE FROM entries WHERE report_id=$1", [r.id]);
+  }
+  await pool.query("DELETE FROM reports WHERE user_id=$1", [id]);
+  await pool.query("DELETE FROM users WHERE id=$1", [id]);
   res.json({ ok: true });
 });
 
 // REPORTS
-app.get("/api/reports", (req, res) => {
-  const reports = db.prepare("SELECT * FROM reports ORDER BY id DESC").all();
-  res.json(reports.map(r => ({
-    ...r,
-    entries: db.prepare("SELECT * FROM entries WHERE report_id=?").all(r.id).map(e => ({
-      ...e,
-      tags: e.tags ? JSON.parse(e.tags) : [],
-      fuentes: db.prepare("SELECT url FROM fuentes WHERE entry_id=?").all(e.id).map(f => f.url)
-    }))
-  })));
+app.get("/api/reports", async (req, res) => {
+  const { rows: reports } = await pool.query("SELECT * FROM reports ORDER BY id DESC");
+  const result = [];
+  for (const r of reports) {
+    const { rows: entries } = await pool.query("SELECT * FROM entries WHERE report_id=$1", [r.id]);
+    const entriesWithFuentes = [];
+    for (const e of entries) {
+      const { rows: fuentes } = await pool.query("SELECT url FROM fuentes WHERE entry_id=$1", [e.id]);
+      entriesWithFuentes.push({
+        ...e,
+        tags: e.tags ? JSON.parse(e.tags) : [],
+        fuentes: fuentes.map(f => f.url)
+      });
+    }
+    result.push({ ...r, entries: entriesWithFuentes });
+  }
+  res.json(result);
 });
 
-app.post("/api/reports", (req, res) => {
+app.post("/api/reports", async (req, res) => {
   const { userId, userName, userArea, weekDate, submittedAt, entries } = req.body;
-  const r = db.prepare("INSERT INTO reports (user_id,user_name,user_area,week_date,submitted_at) VALUES (?,?,?,?,?)")
-    .run(userId, userName, userArea, weekDate, submittedAt);
-  entries.forEach(e => {
-    const er = db.prepare("INSERT INTO entries (report_id,titular,resumen,actores_clave,conclusion,tags) VALUES (?,?,?,?,?,?)")
-      .run(r.lastInsertRowid, e.titular, e.resumen, e.actoresClave, e.conclusion, JSON.stringify(e.tags||[]));
-    (e.fuentes||[]).filter(f=>f.trim()).forEach(url =>
-      db.prepare("INSERT INTO fuentes (entry_id,url) VALUES (?,?)").run(er.lastInsertRowid, url)
+  const r = await pool.query(
+    "INSERT INTO reports (user_id,user_name,user_area,week_date,submitted_at) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+    [userId, userName, userArea, weekDate, submittedAt]
+  );
+  const reportId = r.rows[0].id;
+  for (const e of entries) {
+    const er = await pool.query(
+      "INSERT INTO entries (report_id,titular,resumen,actores_clave,conclusion,tags) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
+      [reportId, e.titular, e.resumen, e.actoresClave, e.conclusion, JSON.stringify(e.tags||[])]
     );
-  });
-  res.json({ id: r.lastInsertRowid });
+    const entryId = er.rows[0].id;
+    for (const url of (e.fuentes||[]).filter(f=>f.trim())) {
+      await pool.query("INSERT INTO fuentes (entry_id,url) VALUES ($1,$2)", [entryId, url]);
+    }
+  }
+  res.json({ id: reportId });
 });
 
-app.delete("/api/reports/:id", (req, res) => {
+app.delete("/api/reports/:id", async (req, res) => {
   const { id } = req.params;
-  db.prepare("SELECT id FROM entries WHERE report_id=?").all(id)
-    .forEach(e => db.prepare("DELETE FROM fuentes WHERE entry_id=?").run(e.id));
-  db.prepare("DELETE FROM entries WHERE report_id=?").run(id);
-  db.prepare("DELETE FROM reports WHERE id=?").run(id);
+  const { rows: entries } = await pool.query("SELECT id FROM entries WHERE report_id=$1", [id]);
+  for (const e of entries) {
+    await pool.query("DELETE FROM fuentes WHERE entry_id=$1", [e.id]);
+  }
+  await pool.query("DELETE FROM entries WHERE report_id=$1", [id]);
+  await pool.query("DELETE FROM reports WHERE id=$1", [id]);
   res.json({ ok: true });
 });
 
@@ -110,9 +132,9 @@ Entradas: ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${
     const jsonMatch = txt.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Gemini no devolvio JSON valido");
     const parsed = JSON.parse(jsonMatch[0]);
-    parsed.entries.forEach(e =>
-      db.prepare("UPDATE entries SET tags=? WHERE id=?").run(JSON.stringify(e.tags), e.id)
-    );
+    for (const e of parsed.entries) {
+      await pool.query("UPDATE entries SET tags=$1 WHERE id=$2", [JSON.stringify(e.tags), e.id]);
+    }
     res.json(parsed);
   } catch (err) {
     console.error("[tag-entries] Error:", err.message);
@@ -168,8 +190,7 @@ app.post("/api/save-to-drive", async (req, res) => {
   const { report } = req.body;
 
   if (!process.env.ZAPIER_WEBHOOK_URL) {
-    console.error("[save-to-drive] ZAPIER_WEBHOOK_URL no esta definida");
-    return res.status(500).json({ error: "ZAPIER_WEBHOOK_URL no configurada en el servidor" });
+    return res.status(500).json({ error: "ZAPIER_WEBHOOK_URL no configurada" });
   }
 
   const nombre = report.user_name || report.userName || "Analista";
@@ -189,7 +210,7 @@ app.post("/api/save-to-drive", async (req, res) => {
   const payload = {
     fileName: `Reporte_${nombre.replace(/ /g, "_")}_${semana}`,
     author: nombre,
-    area: area,
+    area,
     week: semana,
     entriesCount: report.entries.length,
     content: [
@@ -214,14 +235,10 @@ app.post("/api/save-to-drive", async (req, res) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-
-    console.log("[save-to-drive] Zapier status:", response.status);
-
     if (!response.ok) {
       const body = await response.text();
       throw new Error(`Zapier respondio ${response.status}: ${body.substring(0, 100)}`);
     }
-
     res.json({ ok: true });
   } catch (err) {
     console.error("[save-to-drive] Error:", err.message);
@@ -241,6 +258,7 @@ app.listen(PORT, () => {
   console.log("GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "cargada" : "FALTA");
   console.log("ZAPIER_WEBHOOK_URL:", process.env.ZAPIER_WEBHOOK_URL ? "cargada" : "FALTA");
   console.log("ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "cargada" : "FALTA");
+  console.log("DATABASE_URL:", process.env.DATABASE_URL ? "cargada" : "FALTA");
 
   setInterval(() => {
     fetch("https://carreta-backend.onrender.com/api/ping")
