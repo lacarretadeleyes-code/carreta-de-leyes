@@ -167,7 +167,7 @@ app.post("/api/generate-whatsapp", async (req, res) => {
     ].filter(Boolean)));
 
     const fuentesPorEntrada = reports.flatMap(r =>
-      r.entries.map(e => `- ${e.titular}: ${e.fuentesCortas?.join(", ")||"Sin fuentes"}`)
+      r.entries.map(e => `- ${e.titular}: ${(e.fuentes||[]).filter(f=>f).join(", ")||"Sin fuentes"}`)
     ).join("\n");
 
     const authors = [...new Set(reports.map(r => r.user_name || r.userName))].join(", ");
