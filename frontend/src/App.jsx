@@ -97,10 +97,26 @@ function AdminWhatsApp({reports}) {
   const weeks=[...new Set(reports.map(r=>r.week_date))].sort().reverse();
   const weekReports=selWeek?reports.filter(r=>r.week_date===selWeek):[];
 
+  const shortenUrl=async(url)=>{
+    try{
+      const res=await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(url)}`);
+      const data=await res.json();
+      return data.ok?data.result.full_short_link:url;
+    }catch{return url;}
+  };
+
   const generate=async()=>{
     setLoading(true);setWaMsg("");setError(null);
     try{
-      const data=await api("/api/generate-whatsapp",{method:"POST",body:JSON.stringify({reports:weekReports})});
+      // Acortar URLs desde el navegador
+      const reportsConLinks=await Promise.all(weekReports.map(async r=>({
+        ...r,
+        entries:await Promise.all(r.entries.map(async e=>({
+          ...e,
+          fuentes:await Promise.all((e.fuentes||[]).filter(f=>f.trim()).map(shortenUrl))
+        })))
+      })));
+      const data=await api("/api/generate-whatsapp",{method:"POST",body:JSON.stringify({reports:reportsConLinks})});
       if(data.message)setWaMsg(data.message);
       else setError(data.error||"Error al generar.");
     }catch{setError("Error de conexión.");}
@@ -162,7 +178,7 @@ function AdminTemas({reports,onRetagged}) {
           <h3 style={{fontWeight:700,color:"#1e293b",margin:0}}>🏷️ Entradas por Tema</h3>
           <p style={{color:"#94a3b8",fontSize:"0.875rem",margin:"0.25rem 0 0"}}>{untagged>0?`${untagged} sin etiquetar`:"✅ Todas etiquetadas"}</p>
         </div>
-        <button onClick={tagAll} disabled={loading} style={s.btn(loading?"#e2e8f0":"#7c3aed",loading?"#94a3b8":"#fff")}>
+        <button onClick={tagAll} disabled={loading||untagged===0} style={s.btn(loading||untagged===0?"#e2e8f0":"#7c3aed",loading||untagged===0?"#94a3b8":"#fff")}>
           {loading?<><Spinner/>Etiquetando...</>:"🤖 Etiquetar con IA"}
         </button>
       </div>
