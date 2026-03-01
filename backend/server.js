@@ -32,15 +32,7 @@ async function groq(prompt) {
   return data.choices[0].message.content;
 }
 
-async function shortenUrl(url) {
-  try {
-    const res = await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(url)}`, {
-      signal: AbortSignal.timeout(5000)
-    });
-    const data = await res.json();
-    return data.ok ? data.result.full_short_link : url;
-  } catch { return url; }
-}
+
 
 // USERS
 app.get("/api/users", async (req, res) => {
@@ -167,10 +159,6 @@ ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen 
 app.post("/api/generate-whatsapp", async (req, res) => {
   const { reports } = req.body;
   try {
-    for (const r of reports)
-      for (const e of r.entries)
-        e.fuentesCortas = await Promise.all((e.fuentes||[]).filter(f=>f.trim()).map(shortenUrl));
-
     const lines = reports.flatMap(r => r.entries.flatMap(e => [
       `- Titular: ${e.titular}`,
       e.resumen && `  Resumen: ${e.resumen}`,
