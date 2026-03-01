@@ -125,42 +125,37 @@ app.delete("/api/reports/:id", async (req, res) => {
 // TAG ENTRIES
 app.post("/api/tag-entries", async (req, res) => {
   const { entries } = req.body;
-  const prompt = `Eres un clasificador de noticias politicas de Costa Rica.
-Asigna 1-3 etiquetas a cada entrada usando UNICAMENTE estas etiquetas exactas (copia el texto exacto): ${TAGS.join(", ")}.
+  try {
+    const results = [];
+    for (const e of entries) {
+      const prompt = `Eres un clasificador de noticias politicas de Costa Rica.
+Asigna 1-3 etiquetas a esta noticia usando UNICAMENTE estas etiquetas exactas: ${TAGS.join(", ")}.
 
-REGLAS IMPORTANTES:
-- "Politica Exterior" es SOLO para noticias sobre relaciones internacionales o eventos fuera de Costa Rica. NO la uses para politica interna.
-- Usa EXACTAMENTE el texto de la etiqueta como aparece en la lista, sin modificaciones.
+REGLAS:
+- "Politica Exterior" es SOLO para relaciones internacionales o eventos fuera de Costa Rica.
+- Usa EXACTAMENTE el texto de la etiqueta, sin modificaciones.
 - NO inventes etiquetas nuevas.
 
-Responde SOLO con este JSON sin backticks ni texto adicional:
-{"entries":[{"id":"...","tags":["EtiquetaExacta"]}]}
+Responde SOLO con este JSON sin backticks:
+{"id":"${e.id}","tags":["Etiqueta1"]}
 
-Entradas a clasificar:
-${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen || ""}` })))}`;
+Noticia: ${e.titular}. ${e.resumen || ""}`;
 
-  try {
-    const txt = await groq(prompt);
-    console.log("[tag-entries] Respuesta:", txt.substring(0, 300));
-    
-    // Limpiar el texto antes de parsear
-    let clean = txt.replace(/```json|```/g, "").trim();
-    // Extraer solo el JSON
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No devolvio JSON valido");
-    
-    // Limpiar caracteres problemáticos
-    let jsonStr = jsonMatch[0]
-      .replace(/[\u0000-\u001F]/g, " ")  // eliminar caracteres de control
-      .replace(/,\s*([}\]])/g, "$1");      // eliminar comas finales
-    
-    const parsed = JSON.parse(jsonStr);
-    for (const e of parsed.entries) {
-      // Asegurarse que las etiquetas sean válidas
-      const validTags = (e.tags || []).filter(t => TAGS.includes(t));
+      const txt = await groq(prompt);
+      console.log(`[tag-entries] Entrada ${e.id}:`, txt.substring(0, 100));
+      
+      const jsonMatch = txt.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) { results.push({ id: e.id, tags: [] }); continue; }
+      
+      let parsed;
+      try { parsed = JSON.parse(jsonMatch[0]); }
+      catch { results.push({ id: e.id, tags: [] }); continue; }
+      
+      const validTags = (parsed.tags || []).filter(t => TAGS.includes(t));
       await pool.query("UPDATE entries SET tags=$1 WHERE id=$2", [JSON.stringify(validTags), e.id]);
+      results.push({ id: e.id, tags: validTags });
     }
-    res.json(parsed);
+    res.json({ entries: results });
   } catch (err) {
     console.error("[tag-entries] Error:", err.message);
     res.status(500).json({ error: err.message });
