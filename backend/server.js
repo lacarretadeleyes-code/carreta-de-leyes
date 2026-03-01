@@ -24,7 +24,7 @@ async function groq(prompt) {
     body: JSON.stringify({
       model: "llama-3.1-8b-instant",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 2048
+      max_tokens: 4096
     })
   });
   const data = await res.json();
