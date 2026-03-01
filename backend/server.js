@@ -34,11 +34,11 @@ async function groq(prompt) {
 
 async function shortenUrl(url) {
   try {
-    const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`, {
+    const res = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`, {
       signal: AbortSignal.timeout(5000)
     });
     const short = await res.text();
-    return short.startsWith("http") ? short.replace("http://", "https://") : url;
+    return short.startsWith("https://is.gd") ? short.trim() : url;
   } catch { return url; }
 }
 
