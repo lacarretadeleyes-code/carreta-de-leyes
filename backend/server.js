@@ -182,9 +182,9 @@ app.post("/api/save-to-drive", async (req, res) => {
   ).join("\n\n---\n\n");
 
   const payload = {
-    fileName: `Reporte_${report.userName.replace(/ /g, "_")}_${report.weekDate}.txt`,
-    author: report.userName,
-    area: report.userArea,
+    fileName: `Reporte_${(report.user_name||report.userName||"sin_nombre").replace(/ /g, "_")}_${report.week_date||report.weekDate}.txt`,
+    author: report.user_name||report.userName,
+    area: report.user_area||report.userArea,
     week: report.weekDate,
     entriesCount: report.entries.length,
     content: `LA CARRETA DE LEYES\n${"=".repeat(40)}\nAutor: ${report.userName}\nSemana: ${report.weekDate}\n\n${content}\n\n${DISCLAIMER}`
