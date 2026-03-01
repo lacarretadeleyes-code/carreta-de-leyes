@@ -7,7 +7,7 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const DISCLAIMER = "Las opiniones expresadas son personales y no representan la posicion de La Carreta de Leyes.";
 const TAGS = ["Educacion","Seguridad","Economia","Agro","Pensiones","Salud","Politica Exterior","Trabajo","Medioambiente","Tecnologia","Corrupcion"];
