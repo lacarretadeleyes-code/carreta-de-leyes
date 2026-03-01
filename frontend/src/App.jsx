@@ -572,7 +572,7 @@ export default function App() {
     </div>
   );
 
-  if(screen==="empleado") return <EmpleadoScreen currentUser={currentUser} onLogout={()=>setScreen("welcome")}/>;
+  if(screen==="empleado") return <EmpleadoScreen currentUser={currentUser} onLogout={()=>{setScreen("welcome");setAdminPwd("");setAdminError(false);}}/>;
 
   // ADMIN
   return (
@@ -600,7 +600,7 @@ export default function App() {
           <div style={{width:32,height:32,background:"#7c3aed",borderRadius:"0.5rem",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem"}}>⚖️</div>
           <span style={{fontWeight:700,color:"#1e293b"}}>La Carreta de Leyes</span>
         </div>
-        <button onClick={()=>setScreen("welcome")} style={s.btnOutline}>Salir</button>
+        <button onClick={()=>{setScreen("welcome");setAdminPwd("");setAdminError(false);}} style={s.btnOutline}>Salir</button>
       </header>
 
       <div style={{maxWidth:900,margin:"0 auto",padding:"1.5rem"}}>
