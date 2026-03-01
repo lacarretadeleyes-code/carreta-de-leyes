@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
-const API = import.meta.env.VITE_API_URL || "";
+const API = "https://carreta-backend.onrender.com";
 const AREAS = ["Análisis Político","Economía","Seguridad","Legislación","Internacional","General"];
 const TAGS = ["Educación","Seguridad","Economía","Agro","Pensiones","Salud","Política Exterior","Trabajo","Medioambiente","Tecnología","Corrupción"];
 const TAG_COLORS = {"Educación":"#6366f1","Seguridad":"#ef4444","Economía":"#f59e0b","Agro":"#22c55e","Pensiones":"#8b5cf6","Salud":"#06b6d4","Política Exterior":"#3b82f6","Trabajo":"#f97316","Medioambiente":"#10b981","Tecnología":"#0ea5e9","Corrupción":"#dc2626"};
@@ -177,7 +177,7 @@ function AdminTemas({reports,onRetagged}) {
           <h3 style={{fontWeight:700,color:"#1e293b",margin:0}}>🏷️ Entradas por Tema</h3>
           <p style={{color:"#94a3b8",fontSize:"0.875rem",margin:"0.25rem 0 0"}}>{untagged>0?`${untagged} sin etiquetar`:"✅ Todas etiquetadas"}</p>
         </div>
-        <button onClick={tagAll} disabled={loading||untagged===0} style={s.btn(loading||untagged===0?"#e2e8f0":"#7c3aed",loading||untagged===0?"#94a3b8":"#fff")}>
+        <button onClick={tagAll} disabled={loading} style={s.btn(loading?"#e2e8f0":"#7c3aed",loading?"#94a3b8":"#fff")}>
           {loading?<><Spinner/>Etiquetando...</>:"🤖 Etiquetar con IA"}
         </button>
       </div>
