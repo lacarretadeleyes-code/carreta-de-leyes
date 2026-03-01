@@ -9,13 +9,12 @@ const PORT = process.env.PORT || 3001;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-const DISCLAIMER = "Las opiniones expresadas son personales y no representan la posición de La Carreta de Leyes.";
-const TAGS = ["Educación","Seguridad","Economía","Agro","Pensiones","Salud","Política Exterior","Trabajo","Medioambiente","Tecnología","Corrupción"];
+const DISCLAIMER = "Las opiniones expresadas son personales y no representan la posicion de La Carreta de Leyes.";
+const TAGS = ["Educacion","Seguridad","Economia","Agro","Pensiones","Salud","Politica Exterior","Trabajo","Medioambiente","Tecnologia","Corrupcion"];
 
 app.use(cors());
 app.use(express.json());
 
-// Endpoint para mantener el servidor despierto
 app.get("/api/ping", (req, res) => res.json({ ok: true }));
 
 async function gemini(prompt) {
@@ -100,7 +99,7 @@ app.delete("/api/reports/:id", (req, res) => {
 // TAG ENTRIES
 app.post("/api/tag-entries", async (req, res) => {
   const { entries } = req.body;
-  const prompt = `Analiza cada entrada y asígnale 1-3 etiquetas del listado: ${TAGS.join(", ")}.
+  const prompt = `Analiza cada entrada y asignale 1-3 etiquetas del listado: ${TAGS.join(", ")}.
 Responde SOLO JSON sin backticks ni explicaciones adicionales:
 {"entries":[{"id":"...","tags":["Tag1"]}]}
 Entradas: ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen || ""}` })))}`;
@@ -108,11 +107,8 @@ Entradas: ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${
   try {
     const txt = await gemini(prompt);
     console.log("[tag-entries] Respuesta Gemini:", txt.substring(0, 200));
-
-    // Extrae el JSON aunque Gemini agregue texto alrededor
     const jsonMatch = txt.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Gemini no devolvió JSON válido: " + txt.substring(0, 100));
-
+    if (!jsonMatch) throw new Error("Gemini no devolvio JSON valido");
     const parsed = JSON.parse(jsonMatch[0]);
     parsed.entries.forEach(e =>
       db.prepare("UPDATE entries SET tags=? WHERE id=?").run(JSON.stringify(e.tags), e.id)
@@ -135,24 +131,24 @@ app.post("/api/generate-whatsapp", async (req, res) => {
     const lines = reports.flatMap(r => r.entries.flatMap(e => [
       `- Titular: ${e.titular}`,
       e.resumen && `  Resumen: ${e.resumen}`,
-      e.actoresClave && `  Actores: ${e.actoresClave}`,
-      e.conclusion && `  Análisis: ${e.conclusion}`
+      (e.actores_clave || e.actoresClave) && `  Actores: ${e.actores_clave || e.actoresClave}`,
+      e.conclusion && `  Analisis: ${e.conclusion}`
     ].filter(Boolean)));
 
     const fuentesPorEntrada = reports.flatMap(r =>
       r.entries.map(e => `- ${e.titular}: ${e.fuentesCortas?.join(", ")||"Sin fuentes"}`)
     ).join("\n");
 
-    const authors = [...new Set(reports.map(r=>r.userName))].join(", ");
-    const txt = await gemini(`Redacta un boletín político para WhatsApp en español.
+    const authors = [...new Set(reports.map(r => r.user_name || r.userName))].join(", ");
+    const txt = await gemini(`Redacta un boletin politico para WhatsApp en espanol.
 REGLAS:
 - Emojis moderados, formato WhatsApp (*negrita*, _cursiva_)
-- Secciones claras, no pierdas contexto político
-- Fuentes inmediatamente debajo de cada nota: 🔗 https://tinyurl.com/...
-- NO sección de fuentes al final
+- Secciones claras, no pierdas contexto politico
+- Fuentes inmediatamente debajo de cada nota
+- NO seccion de fuentes al final
 - NO menciones etiquetas
-- Penúltima línea: "⚖️ _${DISCLAIMER}_"
-- Última línea: "✍️ _Análisis: ${authors}_"
+- Penultima linea: "Las opiniones expresadas son personales y no representan la posicion de La Carreta de Leyes."
+- Ultima linea: "Analisis: ${authors}"
 - Solo el texto, sin explicaciones
 
 MONITOREO:
@@ -171,23 +167,45 @@ ${fuentesPorEntrada}`);
 app.post("/api/save-to-drive", async (req, res) => {
   const { report } = req.body;
 
-  // Validación temprana de la variable de entorno
   if (!process.env.ZAPIER_WEBHOOK_URL) {
-    console.error("[save-to-drive] ZAPIER_WEBHOOK_URL no está definida en las variables de entorno");
+    console.error("[save-to-drive] ZAPIER_WEBHOOK_URL no esta definida");
     return res.status(500).json({ error: "ZAPIER_WEBHOOK_URL no configurada en el servidor" });
   }
 
-  const content = report.entries.map((e, i) =>
-    `#${i + 1} ${e.titular}\nResumen: ${e.resumen || "—"}\nActores: ${e.actoresClave || "—"}\nConclusión: ${e.conclusion || "—"}\nFuentes: ${(e.fuentes || []).join(", ") || "—"}\nTemas: ${(e.tags || []).join(", ") || "Sin clasificar"}`
-  ).join("\n\n---\n\n");
+  const nombre = report.user_name || report.userName || "Analista";
+  const area   = report.user_area || report.userArea || "";
+  const semana = report.week_date || report.weekDate || "";
+
+  const contenido = report.entries.map((e, i) => [
+    `ENTRADA #${i + 1}`,
+    `Titular:    ${e.titular || "-"}`,
+    `Resumen:    ${e.resumen || "-"}`,
+    `Actores:    ${e.actores_clave || e.actoresClave || "-"}`,
+    `Conclusion: ${e.conclusion || "-"}`,
+    `Fuentes:    ${(e.fuentes || []).filter(f=>f).join(", ") || "-"}`,
+    `Temas:      ${(e.tags || []).join(", ") || "Sin clasificar"}`,
+  ].join("\n")).join("\n\n" + "-".repeat(50) + "\n\n");
 
   const payload = {
-    fileName: `Reporte_${(report.user_name||report.userName||"sin_nombre").replace(/ /g, "_")}_${report.week_date||report.weekDate}.txt`,
-    author: report.user_name||report.userName,
-    area: report.user_area||report.userArea,
-    week: report.weekDate,
+    fileName: `Reporte_${nombre.replace(/ /g, "_")}_${semana}`,
+    author: nombre,
+    area: area,
+    week: semana,
     entriesCount: report.entries.length,
-    content: `LA CARRETA DE LEYES\n${"=".repeat(40)}\nAutor: ${report.userName}\nSemana: ${report.weekDate}\n\n${content}\n\n${DISCLAIMER}`
+    content: [
+      "LA CARRETA DE LEYES - MONITOREO POLITICO",
+      "=".repeat(50),
+      `Autor:    ${nombre}`,
+      `Area:     ${area}`,
+      `Semana:   ${semana}`,
+      `Entradas: ${report.entries.length}`,
+      "=".repeat(50),
+      "",
+      contenido,
+      "",
+      "-".repeat(50),
+      DISCLAIMER
+    ].join("\n")
   };
 
   try {
@@ -201,7 +219,7 @@ app.post("/api/save-to-drive", async (req, res) => {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Zapier respondió ${response.status}: ${body.substring(0, 100)}`);
+      throw new Error(`Zapier respondio ${response.status}: ${body.substring(0, 100)}`);
     }
 
     res.json({ ok: true });
@@ -219,15 +237,14 @@ app.post("/api/admin-auth", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Puerto ${PORT}`);
-  console.log("✅ GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "cargada" : "❌ FALTA");
-  console.log("✅ ZAPIER_WEBHOOK_URL:", process.env.ZAPIER_WEBHOOK_URL ? "cargada" : "❌ FALTA");
-  console.log("✅ ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "cargada" : "❌ FALTA");
+  console.log(`Puerto ${PORT}`);
+  console.log("GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "cargada" : "FALTA");
+  console.log("ZAPIER_WEBHOOK_URL:", process.env.ZAPIER_WEBHOOK_URL ? "cargada" : "FALTA");
+  console.log("ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "cargada" : "FALTA");
 
-  // Mantener el servidor despierto en Render (se pinga a sí mismo cada 10 min)
   setInterval(() => {
-    fetch(`https://carreta-backend.onrender.com/api/ping`)
-      .then(() => console.log("🏓 Ping para mantenerse despierto"))
+    fetch("https://carreta-backend.onrender.com/api/ping")
+      .then(() => console.log("Ping OK"))
       .catch(() => {});
   }, 10 * 60 * 1000);
 });
