@@ -34,7 +34,9 @@ async function groq(prompt) {
 
 async function shortenUrl(url) {
   try {
-    const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+    const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`, {
+      signal: AbortSignal.timeout(5000)
+    });
     const short = await res.text();
     return short.startsWith("https://tinyurl.com") ? short : url;
   } catch { return url; }
@@ -181,21 +183,38 @@ app.post("/api/generate-whatsapp", async (req, res) => {
     ).join("\n");
 
     const authors = [...new Set(reports.map(r => r.user_name || r.userName))].join(", ");
-    const txt = await groq(`Redacta un boletin politico para WhatsApp en espanol.
-REGLAS:
-- Emojis moderados, formato WhatsApp (*negrita*, _cursiva_)
-- Secciones claras, no pierdas contexto politico
-- Fuentes inmediatamente debajo de cada nota
-- NO seccion de fuentes al final
-- NO menciones etiquetas
-- Penultima linea: "Las opiniones expresadas son personales y no representan la posicion de La Carreta de Leyes."
-- Ultima linea: "Analisis: ${authors}"
-- Solo el texto, sin explicaciones
+    const weekDates = [...new Set(reports.map(r => r.week_date || r.weekDate))].sort();
+    const fechaInicio = weekDates[0] || "";
+    const fechaFin = weekDates[weekDates.length-1] || "";
 
-MONITOREO:
+    const txt = await groq(`Redacta un resumen politico para WhatsApp siguiendo EXACTAMENTE este formato:
+
+🇨🇷 *Resumen del Acontecer Político*
+📅 [rango de fechas del periodo cubierto]
+
+Luego por cada noticia:
+[emoji relevante][numero]️⃣ [Titulo corto en negrita]
+[2-3 lineas de resumen claro y directo]
+👉 [Una linea de analisis o conclusion]
+🔗 Fuentes:
+[links uno por linea]
+━━━━━━━━━━━━━━
+
+Al final:
+⚖️ _Las opiniones expresadas son personales y no representan la posicion de La Carreta de Leyes._
+✍️ _Analisis: ${authors}_
+
+REGLAS:
+- Usa emojis relevantes al tema de cada noticia (economía💰, seguridad🚨, ambiente🌿, internacional🌎, etc)
+- NO uses "Politica Exterior" ni menciones etiquetas
+- El rango de fechas es aproximadamente ${fechaInicio} a ${fechaFin}
+- Pon las fuentes EXACTAMENTE como te las doy, sin modificarlas
+- Solo el texto final, sin explicaciones
+
+NOTICIAS:
 ${lines.join("\n")}
 
-FUENTES POR ENTRADA:
+FUENTES POR NOTICIA (usa estas URLs exactas):
 ${fuentesPorEntrada}`);
     res.json({ message: txt.trim() });
   } catch(err) {
