@@ -216,9 +216,9 @@ function AdminTendencias({reports}) {
   const [month,setMonth]=useState(new Date().getMonth()+1);
   const year=new Date().getFullYear();
   const monthReports=reports.filter(r=>{const d=new Date(r.week_date+"T12:00:00");return d.getMonth()+1===month&&d.getFullYear()===year;});
-  const freq={};TAGS.forEach(t=>{freq[t]=0;});
-  monthReports.forEach(r=>r.entries.forEach(e=>(e.tags||[]).forEach(t=>{if(freq[t]!==undefined)freq[t]++;})));
-  const chartData=TAGS.map(t=>({tag:t,count:freq[t]})).filter(d=>d.count>0).sort((a,b)=>b.count-a.count);
+  const freq={};
+  monthReports.forEach(r=>r.entries.forEach(e=>(e.tags||[]).forEach(t=>{if(!freq[t])freq[t]=0;freq[t]++;})));
+  const chartData=Object.entries(freq).map(([tag,count])=>({tag,count})).filter(d=>d.count>0).sort((a,b)=>b.count-a.count);
   const total=chartData.reduce((s,d)=>s+d.count,0);
 
   return (
