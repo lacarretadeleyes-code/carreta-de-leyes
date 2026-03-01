@@ -34,11 +34,11 @@ async function groq(prompt) {
 
 async function shortenUrl(url) {
   try {
-    const res = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`, {
+    const res = await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(url)}`, {
       signal: AbortSignal.timeout(5000)
     });
-    const short = await res.text();
-    return short.startsWith("https://is.gd") ? short.trim() : url;
+    const data = await res.json();
+    return data.ok ? data.result.full_short_link : url;
   } catch { return url; }
 }
 
