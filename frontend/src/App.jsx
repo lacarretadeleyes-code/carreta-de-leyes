@@ -99,9 +99,8 @@ function AdminWhatsApp({reports}) {
 
   const shortenUrl=async(url)=>{
     try{
-      const res=await fetch(`https://api.shorturl.at/shorten?url=${encodeURIComponent(url)}&format=json`);
-      const data=await res.json();
-      return data.shorturl?data.shorturl:url;
+      const data=await api("/api/shorten",{method:"POST",body:JSON.stringify({url})});
+      return data.short||url;
     }catch{return url;}
   };
 
