@@ -131,10 +131,19 @@ app.delete("/api/reports/:id", async (req, res) => {
 // TAG ENTRIES
 app.post("/api/tag-entries", async (req, res) => {
   const { entries } = req.body;
-  const prompt = `Analiza cada entrada y asignale 1-3 etiquetas del listado: ${TAGS.join(", ")}.
-Responde SOLO JSON sin backticks ni explicaciones adicionales:
-{"entries":[{"id":"...","tags":["Tag1"]}]}
-Entradas: ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen || ""}` })))}`;
+  const prompt = `Eres un clasificador de noticias politicas de Costa Rica.
+Asigna 1-3 etiquetas a cada entrada usando UNICAMENTE estas etiquetas exactas (copia el texto exacto): ${TAGS.join(", ")}.
+
+REGLAS IMPORTANTES:
+- "Politica Exterior" es SOLO para noticias sobre relaciones internacionales o eventos fuera de Costa Rica. NO la uses para politica interna.
+- Usa EXACTAMENTE el texto de la etiqueta como aparece en la lista, sin modificaciones.
+- NO inventes etiquetas nuevas.
+
+Responde SOLO con este JSON sin backticks ni texto adicional:
+{"entries":[{"id":"...","tags":["EtiquetaExacta"]}]}
+
+Entradas a clasificar:
+${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen || ""}` })))}`;
 
   try {
     const txt = await groq(prompt);
