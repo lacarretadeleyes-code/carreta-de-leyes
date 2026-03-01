@@ -99,9 +99,9 @@ function AdminWhatsApp({reports}) {
 
   const shortenUrl=async(url)=>{
     try{
-      const res=await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(url)}`);
+      const res=await fetch(`https://api.shorturl.at/shorten?url=${encodeURIComponent(url)}&format=json`);
       const data=await res.json();
-      return data.ok?data.result.full_short_link:url;
+      return data.shorturl?data.shorturl:url;
     }catch{return url;}
   };
 
