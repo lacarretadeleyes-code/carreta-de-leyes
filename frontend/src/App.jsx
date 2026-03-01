@@ -166,9 +166,10 @@ function AdminTemas({reports,onRetagged}) {
     setLoading(false);
   };
 
-  const byTag={};TAGS.forEach(t=>{byTag[t]=[];});
-  allEntries.forEach(e=>(e.tags||[]).forEach(t=>{if(byTag[t])byTag[t].push(e);}));
-  const usedTags=TAGS.filter(t=>byTag[t].length>0);
+  const byTag={};
+  // Incluir etiquetas predefinidas y personalizadas
+  allEntries.forEach(e=>(e.tags||[]).forEach(t=>{if(!byTag[t])byTag[t]=[];byTag[t].push(e);}));
+  const usedTags=[...TAGS.filter(t=>byTag[t]?.length>0), ...Object.keys(byTag).filter(t=>!TAGS.includes(t)&&byTag[t].length>0)];
 
   return (
     <div style={s.cardWhite}>
