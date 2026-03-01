@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
-const API = "https://carreta-backend.onrender.com";
+const API = import.meta.env.VITE_API_URL || "";
 const AREAS = ["Análisis Político","Economía","Seguridad","Legislación","Internacional","General"];
 const TAGS = ["Educación","Seguridad","Economía","Agro","Pensiones","Salud","Política Exterior","Trabajo","Medioambiente","Tecnología","Corrupción"];
 const TAG_COLORS = {"Educación":"#6366f1","Seguridad":"#ef4444","Economía":"#f59e0b","Agro":"#22c55e","Pensiones":"#8b5cf6","Salud":"#06b6d4","Política Exterior":"#3b82f6","Trabajo":"#f97316","Medioambiente":"#10b981","Tecnología":"#0ea5e9","Corrupción":"#dc2626"};
@@ -389,6 +389,7 @@ export default function App() {
   const [screen,setScreen]=useState("welcome");
   const [currentUser,setCurrentUser]=useState(null);
   const [welcomeTab,setWelcomeTab]=useState("volunteer");
+  const [welcomeMode,setWelcomeMode]=useState("select");
   const [draft,setDraft]=useState({name:"",area:AREAS[0],emoji:"👤"});
   const [adminPwd,setAdminPwd]=useState("");
   const [adminError,setAdminError]=useState(false);
@@ -396,6 +397,7 @@ export default function App() {
   const [adminTab,setAdminTab]=useState("whatsapp");
   const [reports,setReports]=useState([]);
   const [users,setUsers]=useState([]);
+  const [welcomeUsers,setWelcomeUsers]=useState([]);
   const [toast,setToast]=useState(null);
   const [deleteConfirm,setDeleteConfirm]=useState(null);
 
@@ -404,15 +406,17 @@ export default function App() {
   const loadReports=()=>api("/api/reports").then(setReports);
   const loadUsers=()=>api("/api/users").then(d=>setUsers(d.filter(u=>u.role==="empleado")));
   useEffect(()=>{if(screen==="admin"){loadReports();loadUsers();}},[screen]);
+  useEffect(()=>{api("/api/users").then(d=>setWelcomeUsers(d.filter(u=>u.role==="empleado")));},[]);
 
   const enterVolunteer=async()=>{
     if(!draft.name.trim()){setVolunteerError(true);return;}
     const user=await api("/api/users",{method:"POST",body:JSON.stringify(draft)});
     setCurrentUser(user);setScreen("empleado");
   };
+  const selectExistingUser=(user)=>{setCurrentUser(user);setScreen("empleado");};
   const enterAdmin=async()=>{
     const data=await api("/api/admin-auth",{method:"POST",body:JSON.stringify({password:adminPwd})});
-    if(data.ok){setAdminError(false);setAdminPwd("");setCurrentUser({id:0,name:"Admin",emoji:"🛠️",role:"admin"});setScreen("admin");}
+    if(data.ok){setAdminError(false);setCurrentUser({id:0,name:"Admin",emoji:"🛠️",role:"admin"});setScreen("admin");}
     else setAdminError(true);
   };
   const confirmDelete=(type,id,label)=>setDeleteConfirm({type,id,label});
@@ -452,32 +456,58 @@ export default function App() {
 
         {welcomeTab==="volunteer"&&(
           <div style={s.card}>
-            <p style={{color:"rgba(255,255,255,0.7)",fontSize:"0.875rem",marginTop:0}}>Personaliza tu perfil antes de ingresar.</p>
-            <label style={s.labelDark}>Elige tu ícono</label>
-            <div style={{display:"flex",flexWrap:"wrap",gap:"0.5rem",marginBottom:"1.25rem"}}>
-              {EMOJIS.map(em=>(
-                <button key={em} onClick={()=>setDraft(p=>({...p,emoji:em}))}
-                  style={{width:40,height:40,fontSize:"1.25rem",borderRadius:"0.625rem",border:draft.emoji===em?"2px solid #fff":"2px solid transparent",
-                    background:draft.emoji===em?"rgba(124,58,237,0.5)":"rgba(255,255,255,0.1)",cursor:"pointer"}}>
-                  {em}
+            {welcomeMode==="select"&&welcomeUsers.length>0?(
+              <>
+                <p style={{color:"rgba(255,255,255,0.7)",fontSize:"0.875rem",marginTop:0}}>Selecciona tu perfil para ingresar.</p>
+                <div style={{display:"flex",flexDirection:"column",gap:"0.5rem",marginBottom:"1rem"}}>
+                  {welcomeUsers.map(u=>(
+                    <button key={u.id} onClick={()=>selectExistingUser(u)}
+                      style={{display:"flex",alignItems:"center",gap:"0.75rem",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",
+                        borderRadius:"0.75rem",padding:"0.75rem",cursor:"pointer",width:"100%",textAlign:"left"}}>
+                      <div style={{width:40,height:40,borderRadius:"50%",background:AV_COLORS[(u.id-1)%AV_COLORS.length],display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.25rem",flexShrink:0}}>{u.emoji||"👤"}</div>
+                      <div><div style={{color:"#fff",fontWeight:600,fontSize:"0.875rem"}}>{u.name}</div><div style={{color:"#94a3b8",fontSize:"0.75rem"}}>{u.area}</div></div>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={()=>setWelcomeMode("new")} style={{...s.btnOutline,width:"100%",justifyContent:"center",background:"transparent",color:"rgba(255,255,255,0.5)",border:"1px dashed rgba(255,255,255,0.2)",padding:"0.625rem"}}>
+                  + Crear nuevo perfil
                 </button>
-              ))}
-            </div>
-            <label style={s.labelDark}>Nombre completo</label>
-            <input value={draft.name} onChange={e=>{setDraft(p=>({...p,name:e.target.value}));setVolunteerError(false);}}
-              placeholder="Ej. María Rodríguez" style={{...s.input(volunteerError),marginBottom:volunteerError?"0.25rem":"1rem"}}/>
-            {volunteerError&&<p style={{color:"#f87171",fontSize:"0.75rem",margin:"0 0 1rem"}}>Por favor ingresa tu nombre.</p>}
-            <label style={s.labelDark}>Área</label>
-            <select value={draft.area} onChange={e=>setDraft(p=>({...p,area:e.target.value}))} style={{...s.selectDark,marginBottom:"1.25rem"}}>
-              {AREAS.map(a=><option key={a} value={a}>{a}</option>)}
-            </select>
-            {draft.name.trim()&&(
-              <div style={{display:"flex",alignItems:"center",gap:"0.75rem",background:"rgba(255,255,255,0.1)",borderRadius:"0.75rem",padding:"0.75rem",marginBottom:"1.25rem"}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.25rem"}}>{draft.emoji}</div>
-                <div><div style={{color:"#fff",fontWeight:600,fontSize:"0.875rem"}}>{draft.name}</div><div style={{color:"#94a3b8",fontSize:"0.75rem"}}>{draft.area} · Analista</div></div>
-              </div>
+              </>
+            ):(
+              <>
+                {welcomeUsers.length>0&&(
+                  <button onClick={()=>setWelcomeMode("select")} style={{...s.btnOutline,background:"transparent",color:"rgba(255,255,255,0.5)",border:"none",padding:"0 0 0.75rem",fontSize:"0.8rem",cursor:"pointer"}}>
+                    ← Volver a perfiles
+                  </button>
+                )}
+                <p style={{color:"rgba(255,255,255,0.7)",fontSize:"0.875rem",marginTop:0}}>Personaliza tu perfil antes de ingresar.</p>
+                <label style={s.labelDark}>Elige tu ícono</label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"0.5rem",marginBottom:"1.25rem"}}>
+                  {EMOJIS.map(em=>(
+                    <button key={em} onClick={()=>setDraft(p=>({...p,emoji:em}))}
+                      style={{width:40,height:40,fontSize:"1.25rem",borderRadius:"0.625rem",border:draft.emoji===em?"2px solid #fff":"2px solid transparent",
+                        background:draft.emoji===em?"rgba(124,58,237,0.5)":"rgba(255,255,255,0.1)",cursor:"pointer"}}>
+                      {em}
+                    </button>
+                  ))}
+                </div>
+                <label style={s.labelDark}>Nombre completo</label>
+                <input value={draft.name} onChange={e=>{setDraft(p=>({...p,name:e.target.value}));setVolunteerError(false);}}
+                  placeholder="Ej. María Rodríguez" style={{...s.input(volunteerError),marginBottom:volunteerError?"0.25rem":"1rem"}}/>
+                {volunteerError&&<p style={{color:"#f87171",fontSize:"0.75rem",margin:"0 0 1rem"}}>Por favor ingresa tu nombre.</p>}
+                <label style={s.labelDark}>Área</label>
+                <select value={draft.area} onChange={e=>setDraft(p=>({...p,area:e.target.value}))} style={{...s.selectDark,marginBottom:"1.25rem"}}>
+                  {AREAS.map(a=><option key={a} value={a}>{a}</option>)}
+                </select>
+                {draft.name.trim()&&(
+                  <div style={{display:"flex",alignItems:"center",gap:"0.75rem",background:"rgba(255,255,255,0.1)",borderRadius:"0.75rem",padding:"0.75rem",marginBottom:"1.25rem"}}>
+                    <div style={{width:40,height:40,borderRadius:"50%",background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.25rem"}}>{draft.emoji}</div>
+                    <div><div style={{color:"#fff",fontWeight:600,fontSize:"0.875rem"}}>{draft.name}</div><div style={{color:"#94a3b8",fontSize:"0.75rem"}}>{draft.area} · Analista</div></div>
+                  </div>
+                )}
+                <button onClick={enterVolunteer} style={{...s.btn("#7c3aed"),width:"100%",justifyContent:"center",padding:"0.875rem"}}>Ingresar →</button>
+              </>
             )}
-            <button onClick={enterVolunteer} style={{...s.btn("#7c3aed"),width:"100%",justifyContent:"center",padding:"0.875rem"}}>Ingresar →</button>
           </div>
         )}
 
