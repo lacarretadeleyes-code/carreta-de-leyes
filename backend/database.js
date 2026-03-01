@@ -1,42 +1,46 @@
-const Database = require("better-sqlite3");
-const path = require("path");
+const { Pool } = require("pg");
 
-const db = new Database(path.join(__dirname, "carreta.db"));
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    area TEXT,
-    emoji TEXT DEFAULT '👤',
-    role TEXT DEFAULT 'empleado',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS reports (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    user_name TEXT,
-    user_area TEXT,
-    week_date TEXT,
-    submitted_at TEXT,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-  CREATE TABLE IF NOT EXISTS entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    report_id INTEGER,
-    titular TEXT,
-    resumen TEXT,
-    actores_clave TEXT,
-    conclusion TEXT,
-    tags TEXT DEFAULT '[]',
-    FOREIGN KEY(report_id) REFERENCES reports(id)
-  );
-  CREATE TABLE IF NOT EXISTS fuentes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    entry_id INTEGER,
-    url TEXT,
-    FOREIGN KEY(entry_id) REFERENCES entries(id)
-  );
-`);
+async function init() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      area TEXT,
+      emoji TEXT DEFAULT '👤',
+      role TEXT DEFAULT 'empleado',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS reports (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER,
+      user_name TEXT,
+      user_area TEXT,
+      week_date TEXT,
+      submitted_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS entries (
+      id SERIAL PRIMARY KEY,
+      report_id INTEGER,
+      titular TEXT,
+      resumen TEXT,
+      actores_clave TEXT,
+      conclusion TEXT,
+      tags TEXT DEFAULT '[]'
+    );
+    CREATE TABLE IF NOT EXISTS fuentes (
+      id SERIAL PRIMARY KEY,
+      entry_id INTEGER,
+      url TEXT
+    );
+  `);
+  console.log("Base de datos lista");
+}
 
-module.exports = db;
+init().catch(console.error);
+
+module.exports = pool;
