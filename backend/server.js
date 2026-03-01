@@ -141,12 +141,24 @@ ${JSON.stringify(entries.map(e => ({ id: e.id, text: `${e.titular}. ${e.resumen 
 
   try {
     const txt = await groq(prompt);
-    console.log("[tag-entries] Respuesta:", txt.substring(0, 200));
-    const jsonMatch = txt.match(/\{[\s\S]*\}/);
+    console.log("[tag-entries] Respuesta:", txt.substring(0, 300));
+    
+    // Limpiar el texto antes de parsear
+    let clean = txt.replace(/```json|```/g, "").trim();
+    // Extraer solo el JSON
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No devolvio JSON valido");
-    const parsed = JSON.parse(jsonMatch[0]);
+    
+    // Limpiar caracteres problemáticos
+    let jsonStr = jsonMatch[0]
+      .replace(/[\u0000-\u001F]/g, " ")  // eliminar caracteres de control
+      .replace(/,\s*([}\]])/g, "$1");      // eliminar comas finales
+    
+    const parsed = JSON.parse(jsonStr);
     for (const e of parsed.entries) {
-      await pool.query("UPDATE entries SET tags=$1 WHERE id=$2", [JSON.stringify(e.tags), e.id]);
+      // Asegurarse que las etiquetas sean válidas
+      const validTags = (e.tags || []).filter(t => TAGS.includes(t));
+      await pool.query("UPDATE entries SET tags=$1 WHERE id=$2", [JSON.stringify(validTags), e.id]);
     }
     res.json(parsed);
   } catch (err) {
