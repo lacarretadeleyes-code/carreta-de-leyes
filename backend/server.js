@@ -38,7 +38,7 @@ async function shortenUrl(url) {
       signal: AbortSignal.timeout(5000)
     });
     const short = await res.text();
-    return short.startsWith("https://tinyurl.com") ? short : url;
+    return short.startsWith("http") ? short.replace("http://", "https://") : url;
   } catch { return url; }
 }
 
