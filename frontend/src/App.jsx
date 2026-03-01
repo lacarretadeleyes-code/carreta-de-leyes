@@ -3,8 +3,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 
 const API = "https://carreta-backend.onrender.com";
 const AREAS = ["Análisis Político","Economía","Seguridad","Legislación","Internacional","General"];
-const TAGS = ["Educación","Seguridad","Economía","Agro","Pensiones","Salud","Política Exterior","Trabajo","Medioambiente","Tecnología","Corrupción"];
-const TAG_COLORS = {"Educación":"#6366f1","Seguridad":"#ef4444","Economía":"#f59e0b","Agro":"#22c55e","Pensiones":"#8b5cf6","Salud":"#06b6d4","Política Exterior":"#3b82f6","Trabajo":"#f97316","Medioambiente":"#10b981","Tecnología":"#0ea5e9","Corrupción":"#dc2626"};
+const TAGS = ["Seguridad","Economía/Negocios","Trabajo","Transporte","Ambiente","Agro","Turismo","Política Exterior","Educación","Salud","Pensiones"];
+const TAG_COLORS = {"Seguridad":"#ef4444","Economía/Negocios":"#f59e0b","Trabajo":"#f97316","Transporte":"#0ea5e9","Ambiente":"#10b981","Agro":"#22c55e","Turismo":"#06b6d4","Política Exterior":"#3b82f6","Educación":"#6366f1","Salud":"#06b6d4","Pensiones":"#8b5cf6"};
 const AV_COLORS = ["#7c3aed","#3b82f6","#14b8a6","#f43f5e","#f59e0b","#6366f1"];
 const EMOJIS = ["👤","👩‍💻","👨‍💻","🧑‍💼","👩‍🔬","🧑‍🎨","🦸","🧑‍🏫","📣","💼","🎨","🚀","⭐","🦊","🧑‍🔧"];
 const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -177,9 +177,7 @@ function AdminTemas({reports,onRetagged}) {
           <h3 style={{fontWeight:700,color:"#1e293b",margin:0}}>🏷️ Entradas por Tema</h3>
           <p style={{color:"#94a3b8",fontSize:"0.875rem",margin:"0.25rem 0 0"}}>{untagged>0?`${untagged} sin etiquetar`:"✅ Todas etiquetadas"}</p>
         </div>
-        <button onClick={tagAll} disabled={loading} style={s.btn(loading?"#e2e8f0":"#7c3aed",loading?"#94a3b8":"#fff")}>
-          {loading?<><Spinner/>Etiquetando...</>:"🤖 Etiquetar con IA"}
-        </button>
+
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:"0.5rem",marginBottom:"1rem"}}>
         <button onClick={()=>setSelTag(null)} style={s.btn(selTag===null?"#1e293b":"#f1f5f9",selTag===null?"#fff":"#475569")} >Todos</button>
@@ -190,7 +188,7 @@ function AdminTemas({reports,onRetagged}) {
         ))}
       </div>
       {usedTags.length===0
-        ?<div style={{border:"2px dashed #e2e8f0",borderRadius:"0.75rem",padding:"2rem",textAlign:"center",color:"#94a3b8",fontSize:"0.875rem"}}><div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🏷️</div>Haz clic en "Etiquetar con IA".</div>
+        ?<div style={{border:"2px dashed #e2e8f0",borderRadius:"0.75rem",padding:"2rem",textAlign:"center",color:"#94a3b8",fontSize:"0.875rem"}}><div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>🏷️</div>No hay entradas con temas asignados aún.</div>
         :<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
           {(selTag?[selTag]:usedTags).map(tag=>(
             <div key={tag}>
@@ -363,6 +361,35 @@ function EmpleadoScreen({currentUser,onLogout}) {
                       </div>
                     ))}
                     <button onClick={()=>addFuente(entry.id)} style={{background:"none",border:"none",color:"#7c3aed",cursor:"pointer",fontSize:"0.8rem",fontWeight:600,padding:0}}>+ Agregar fuente</button>
+                  </div>
+                  <div>
+                    <label style={{fontSize:"0.8rem",fontWeight:600,color:"#475569",display:"block",marginBottom:"0.375rem"}}>Temas</label>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:"0.5rem",marginBottom:"0.5rem"}}>
+                      {TAGS.map(tag=>(
+                        <button key={tag} type="button" onClick={()=>upEntry(entry.id,"tags",entry.tags.includes(tag)?entry.tags.filter(t=>t!==tag):[...entry.tags,tag])}
+                          style={{padding:"0.25rem 0.75rem",borderRadius:"9999px",border:`2px solid ${entry.tags.includes(tag)?TAG_COLORS[tag]||"#7c3aed":"#e2e8f0"}`,
+                            background:entry.tags.includes(tag)?TAG_COLORS[tag]||"#7c3aed":"#fff",
+                            color:entry.tags.includes(tag)?"#fff":"#475569",fontSize:"0.75rem",fontWeight:600,cursor:"pointer"}}>
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                    {entry.tags.includes("Otra")!==undefined&&(
+                      <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+                        <button type="button" onClick={()=>upEntry(entry.id,"tags",entry.tags.some(t=>!TAGS.includes(t))?entry.tags.filter(t=>TAGS.includes(t)):entry.tags)}
+                          style={{padding:"0.25rem 0.75rem",borderRadius:"9999px",border:"2px dashed #e2e8f0",background:"#fff",color:"#94a3b8",fontSize:"0.75rem",fontWeight:600,cursor:"pointer"}}>
+                          + Otra
+                        </button>
+                        <input placeholder="Escribe una etiqueta..." 
+                          onKeyDown={e=>{if(e.key==="Enter"&&e.target.value.trim()){upEntry(entry.id,"tags",[...entry.tags.filter(t=>t!==e.target.value.trim()),e.target.value.trim()]);e.target.value="";}}}
+                          style={{...s.inputWhite,flex:1,padding:"0.25rem 0.75rem",fontSize:"0.75rem"}}/>
+                      </div>
+                    )}
+                    {entry.tags.filter(t=>!TAGS.includes(t)).map(t=>(
+                      <span key={t} style={{display:"inline-flex",alignItems:"center",gap:"0.25rem",background:"#f1f5f9",borderRadius:"9999px",padding:"0.125rem 0.625rem",fontSize:"0.75rem",marginTop:"0.25rem",marginRight:"0.25rem"}}>
+                        {t}<button type="button" onClick={()=>upEntry(entry.id,"tags",entry.tags.filter(x=>x!==t))} style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",padding:0}}>✕</button>
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
