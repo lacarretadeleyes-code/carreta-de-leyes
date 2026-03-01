@@ -272,6 +272,18 @@ app.post("/api/save-to-drive", async (req, res) => {
   }
 });
 
+// SHORTEN URL
+app.post("/api/shorten", async (req, res) => {
+  const { url } = req.body;
+  try {
+    const r = await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(url)}`);
+    const data = await r.json();
+    res.json({ short: data.ok ? data.result.full_short_link : url });
+  } catch {
+    res.json({ short: url });
+  }
+});
+
 // ADMIN AUTH
 app.post("/api/admin-auth", (req, res) => {
   req.body.password === process.env.ADMIN_PASSWORD
