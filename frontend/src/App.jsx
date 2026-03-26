@@ -213,9 +213,10 @@ function AdminTemas({reports,onRetagged}) {
 }
 
 function AdminTendencias({reports}) {
-  const [month,setMonth]=useState(new Date().getMonth()+1);
+  const [selMonths,setSelMonths]=useState([new Date().getMonth()+1]);
   const year=new Date().getFullYear();
-  const monthReports=reports.filter(r=>{const d=new Date(r.week_date+"T12:00:00");return d.getMonth()+1===month&&d.getFullYear()===year;});
+  const toggleMonth=m=>setSelMonths(p=>p.includes(m)?p.length>1?p.filter(x=>x!==m):p:[...p,m]);
+  const monthReports=reports.filter(r=>{const d=new Date(r.week_date+"T12:00:00");return selMonths.includes(d.getMonth()+1)&&d.getFullYear()===year;});
   const freq={};
   monthReports.forEach(r=>r.entries.forEach(e=>(e.tags||[]).forEach(t=>{if(!freq[t])freq[t]=0;freq[t]++;})));
   const chartData=Object.entries(freq).map(([tag,count])=>({tag,count})).filter(d=>d.count>0).sort((a,b)=>b.count-a.count);
@@ -228,9 +229,13 @@ function AdminTendencias({reports}) {
           <h3 style={{fontWeight:700,color:"#1e293b",margin:0}}>📈 Agenda Política Mensual</h3>
           <p style={{color:"#94a3b8",fontSize:"0.875rem",margin:"0.25rem 0 0"}}>Frecuencia de temas</p>
         </div>
-        <select value={month} onChange={e=>setMonth(Number(e.target.value))} style={{...s.select,width:"auto"}}>
-          {MONTHS.map((m,i)=><option key={i} value={i+1}>{m} {year}</option>)}
-        </select>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"0.375rem"}}>
+          {MONTHS.map((m,i)=>(
+        <button key={i} onClick={()=>toggleMonth(i+1)} ...>
+          {m.slice(0,3)}
+        </button>
+ ))}
+</div>
       </div>
       {chartData.length===0
         ?<div style={{border:"2px dashed #e2e8f0",borderRadius:"0.75rem",padding:"2rem",textAlign:"center",color:"#94a3b8",fontSize:"0.875rem"}}><div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📊</div>No hay datos en {MONTHS[month-1]}. Etiqueta primero.</div>
