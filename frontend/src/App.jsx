@@ -213,33 +213,35 @@ function AdminTemas({reports,onRetagged}) {
 }
 
 function AdminTendencias({reports}) {
-  const [selMonths,setSelMonths]=useState([new Date().getMonth()+1]);
   const year=new Date().getFullYear();
+  const [selMonths,setSelMonths]=useState([new Date().getMonth()+1]);
   const toggleMonth=m=>setSelMonths(p=>p.includes(m)?p.length>1?p.filter(x=>x!==m):p:[...p,m]);
   const monthReports=reports.filter(r=>{const d=new Date(r.week_date+"T12:00:00");return selMonths.includes(d.getMonth()+1)&&d.getFullYear()===year;});
   const freq={};
   monthReports.forEach(r=>r.entries.forEach(e=>(e.tags||[]).forEach(t=>{if(!freq[t])freq[t]=0;freq[t]++;})));
   const chartData=Object.entries(freq).map(([tag,count])=>({tag,count})).filter(d=>d.count>0).sort((a,b)=>b.count-a.count);
   const total=chartData.reduce((s,d)=>s+d.count,0);
+  const monthLabel=selMonths.length===1?MONTHS[selMonths[0]-1]:selMonths.map(m=>MONTHS[m-1].slice(0,3)).join(", ");
 
   return (
     <div style={s.cardWhite}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.25rem",flexWrap:"wrap",gap:"0.75rem"}}>
-        <div>
-          <h3 style={{fontWeight:700,color:"#1e293b",margin:0}}>📈 Agenda Política Mensual</h3>
-          <p style={{color:"#94a3b8",fontSize:"0.875rem",margin:"0.25rem 0 0"}}>Frecuencia de temas</p>
-        </div>
+      <div style={{marginBottom:"1rem"}}>
+        <h3 style={{fontWeight:700,color:"#1e293b",margin:"0 0 0.75rem"}}>📈 Agenda Política Mensual</h3>
         <div style={{display:"flex",flexWrap:"wrap",gap:"0.375rem"}}>
           {MONTHS.map((m,i)=>(
-        <button key={i} onClick={()=>toggleMonth(i+1)} ...>
-          {m.slice(0,3)}
-        </button>
- ))}
-</div>
+            <button key={i} onClick={()=>toggleMonth(i+1)}
+              style={{padding:"0.25rem 0.625rem",borderRadius:"9999px",border:"none",cursor:"pointer",fontSize:"0.75rem",fontWeight:600,
+                background:selMonths.includes(i+1)?"#7c3aed":"#f1f5f9",
+                color:selMonths.includes(i+1)?"#fff":"#475569"}}>
+              {m.slice(0,3)}
+            </button>
+          ))}
+        </div>
       </div>
       {chartData.length===0
-        ?<div style={{border:"2px dashed #e2e8f0",borderRadius:"0.75rem",padding:"2rem",textAlign:"center",color:"#94a3b8",fontSize:"0.875rem"}}><div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📊</div>No hay datos en {MONTHS[month-1]}. Etiqueta primero.</div>
+        ?<div style={{border:"2px dashed #e2e8f0",borderRadius:"0.75rem",padding:"2rem",textAlign:"center",color:"#94a3b8",fontSize:"0.875rem"}}><div style={{fontSize:"2rem",marginBottom:"0.5rem"}}>📊</div>No hay datos en {monthLabel}. Etiqueta primero.</div>
         :<>
+          <p style={{fontSize:"0.75rem",color:"#94a3b8",margin:"0 0 0.75rem"}}>Mostrando: {monthLabel} {year}</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData} margin={{top:5,right:10,left:-20,bottom:65}}>
               <XAxis dataKey="tag" tick={{fontSize:10}} angle={-40} textAnchor="end" interval={0}/>
