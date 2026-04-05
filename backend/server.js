@@ -222,8 +222,8 @@ ${fuentesPorEntrada}`);
 app.post("/api/save-to-drive", async (req, res) => {
   const { report } = req.body;
 
-  if (!process.env.ZAPIER_WEBHOOK_URL) {
-    return res.status(500).json({ error: "ZAPIER_WEBHOOK_URL no configurada" });
+  if (!process.env.APPS_SCRIPT_URL) {
+    return res.status(500).json({ error: "APPS_SCRIPT_URL no configurada" });
   }
 
   const nombre = report.user_name || report.userName || "Analista";
@@ -242,11 +242,7 @@ app.post("/api/save-to-drive", async (req, res) => {
 
   const payload = {
     fileName: `Reporte_${nombre.replace(/ /g, "_")}_${semana}`,
-    author: nombre,
-    area,
-    week: semana,
-    entriesCount: report.entries.length,
-    content: [
+    fileContent: [
       "LA CARRETA DE LEYES - MONITOREO POLITICO",
       "=".repeat(50),
       `Autor:    ${nombre}`,
@@ -263,14 +259,14 @@ app.post("/api/save-to-drive", async (req, res) => {
   };
 
   try {
-    const response = await fetch(process.env.ZAPIER_WEBHOOK_URL, {
+    const response = await fetch(process.env.APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Zapier respondio ${response.status}: ${body.substring(0, 100)}`);
+      throw new Error(`Apps Script respondio ${response.status}: ${body.substring(0, 100)}`);
     }
     res.json({ ok: true });
   } catch (err) {
@@ -301,7 +297,7 @@ app.post("/api/admin-auth", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Puerto ${PORT}`);
   console.log("GROQ_API_KEY:", process.env.GROQ_API_KEY ? "cargada" : "FALTA");
-  console.log("ZAPIER_WEBHOOK_URL:", process.env.ZAPIER_WEBHOOK_URL ? "cargada" : "FALTA");
+  console.log("APPS_SCRIPT_URL:", process.env.APPS_SCRIPT_URL ? "cargada" : "FALTA");
   console.log("ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "cargada" : "FALTA");
   console.log("DATABASE_URL:", process.env.DATABASE_URL ? "cargada" : "FALTA");
 
