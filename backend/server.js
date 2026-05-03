@@ -301,9 +301,17 @@ app.listen(PORT, () => {
   console.log("ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "cargada" : "FALTA");
   console.log("DATABASE_URL:", process.env.DATABASE_URL ? "cargada" : "FALTA");
 
+  // Mantener Render activo (cada 10 minutos)
   setInterval(() => {
     fetch("https://carreta-backend.onrender.com/api/ping")
       .then(() => console.log("Ping OK"))
       .catch(() => {});
   }, 10 * 60 * 1000);
+
+  // Mantener Supabase activo (cada 3 días)
+  setInterval(() => {
+    pool.query("SELECT 1")
+      .then(() => console.log("Supabase keep-alive OK"))
+      .catch(err => console.error("Supabase keep-alive error:", err.message));
+  }, 3 * 24 * 60 * 60 * 1000);
 });
