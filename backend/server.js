@@ -303,7 +303,7 @@ app.listen(PORT, () => {
 
   // Mantener Render activo (cada 10 minutos)
   setInterval(() => {
-    fetch("https://carreta-backend.onrender.com/api/ping")
+    fetch("https://carreta-de-leyes.onrender.com/api/ping")
       .then(() => console.log("Ping OK"))
       .catch(() => {});
   }, 10 * 60 * 1000);
