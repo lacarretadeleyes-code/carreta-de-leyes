@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
-const API = "https://carreta-backend.onrender.com";
+const API = "https://carreta-de-leyes.onrender.com";
 const AREAS = ["Análisis Político","Economía","Seguridad","Legislación","Internacional","General"];
 const TAGS = ["Seguridad","Economía/Negocios","Trabajo","Transporte","Ambiente","Agro","Turismo","Política Exterior","Educación","Salud","Pensiones"];
 const TAG_COLORS = {"Seguridad":"#ef4444","Economía/Negocios":"#f59e0b","Trabajo":"#f97316","Transporte":"#0ea5e9","Ambiente":"#10b981","Agro":"#22c55e","Turismo":"#06b6d4","Política Exterior":"#3b82f6","Educación":"#6366f1","Salud":"#06b6d4","Pensiones":"#8b5cf6"};
